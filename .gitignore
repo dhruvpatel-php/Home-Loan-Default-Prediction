@@ -1,0 +1,21 @@
+# Datasets and large raw CSV files (exceeds GitHub 100MB limit)
+*.csv
+*.zip
+*.bak
+*.original_backup
+*.audit_backup
+
+# Python cache and temporary environments
+__pycache__/
+*.pyc
+*.pyo
+.ipynb_checkpoints/
+catboost_info/
+
+# Temporary test scripts
+test_*.py
+dump_cells.py
+inspect_details.py
+audit_notebook.py
+check_supp.py
+prototype_pipeline.py
