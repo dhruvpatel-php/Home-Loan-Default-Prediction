@@ -1,0 +1,83 @@
+name: Keep Streamlit App Awake
+
+on:
+  schedule:
+    # Run every 12 hours
+    - cron: '0 */12 * * *'
+  workflow_dispatch:
+
+jobs:
+  keep_alive:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+
+      - name: Install Playwright and Chromium
+        run: |
+          python -m pip install --upgrade pip
+          pip install playwright
+          playwright install chromium --with-deps
+
+      - name: Visit Streamlit App and Reset Timer
+        run: |
+          python - << 'EOF'
+          import sys
+          import time
+          from playwright.sync_api import sync_playwright
+
+          APP_URL = "https://home-loan-default-prediction-by-dhruv.streamlit.app/"
+          print(f"Pinging Streamlit App: {APP_URL}")
+
+          with sync_playwright() as p:
+              browser = p.chromium.launch(headless=True)
+              context = browser.new_context(
+                  user_agent="Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36"
+              )
+              page = context.new_page()
+
+              print("Navigating to app URL...")
+              try:
+                  page.goto(APP_URL, timeout=60000, wait_until="domcontentloaded")
+              except Exception as e:
+                  print(f"Navigation warning: {e}")
+
+              # Allow initial page render and WebSocket connection
+              time.sleep(12)
+
+              content = page.content()
+              is_asleep = "This app has gone to sleep" in content or "Zzzz" in content
+
+              if is_asleep:
+                  print("App is in sleep mode. Searching for wake-up button...")
+                  wake_btn = page.locator('button:has-text("Yes, get this app back up!")')
+                  if wake_btn.count() == 0:
+                      wake_btn = page.locator('button:has-text("get this app back up")')
+
+                  if wake_btn.count() > 0:
+                      print("Wake-up button found. Clicking button to boot container...")
+                      wake_btn.first.click()
+                      print("Clicked wake-up button. Waiting 30 seconds for container startup...")
+                      time.sleep(30)
+                      print("Wake-up signal delivered successfully.")
+                  else:
+                      print("Sleep text found but button selector was not visible.")
+              else:
+                  print("App is currently awake and active. Session established to reset inactivity timer.")
+
+              # Check if app view container is mounted
+              try:
+                  page.wait_for_selector('[data-testid="stAppViewContainer"]', timeout=30000)
+                  print("Streamlit main app view container confirmed active.")
+              except Exception:
+                  print("App container mount check completed.")
+
+              browser.close()
+              print("Keep-alive task completed successfully.")
+          EOF
